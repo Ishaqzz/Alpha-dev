@@ -22,8 +22,8 @@ export default function MaterialDatePicker({
   onSetDate,
 }: MaterialDatePickerProps) {
   // Calendar Year & Month States
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(6); // July (0-indexed)
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   
   // Highlighted Date State
   const [tempSelectedDate, setTempSelectedDate] = useState<string | null>(null);
@@ -36,7 +36,8 @@ export default function MaterialDatePicker({
   // Synchronize initial selection on mount/show
   useEffect(() => {
     if (visible) {
-      const activeDate = initialDate || '2/7/2026';
+      const today = new Date();
+      const activeDate = initialDate || `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`;
       setTempSelectedDate(activeDate);
       
       const parts = activeDate.split('/');
@@ -98,13 +99,24 @@ export default function MaterialDatePicker({
   // Generate calendar days grid
   const daysInMonth = getDaysInMonth(currentMonth, currentYear);
   const firstDay = getFirstDayOfMonth(currentMonth, currentYear);
-  const cells: { key: string; label: string; value: string | null }[] = [];
+  const cells: { key: string; label: string; value: string | null; isFuture?: boolean }[] = [];
   
   for (let i = 0; i < firstDay; i++) {
     cells.push({ key: `empty-${i}`, label: '', value: null });
   }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ key: `day-${d}`, label: `${d}`, value: `${d}/${currentMonth + 1}/${currentYear}` });
+    const cellDate = new Date(currentYear, currentMonth, d);
+    const isFuture = cellDate > today;
+    cells.push({ 
+      key: `day-${d}`, 
+      label: `${d}`, 
+      value: `${d}/${currentMonth + 1}/${currentYear}`,
+      isFuture
+    });
   }
 
   return (
@@ -150,16 +162,17 @@ export default function MaterialDatePicker({
                   style={[
                     styles.dayCellBtn,
                     isSelected && styles.dayCellBtnSelected,
-                    !cell.value && styles.dayCellBtnEmpty
+                    !cell.value && styles.dayCellBtnEmpty,
                   ]}
-                  disabled={!cell.value}
+                  disabled={!cell.value || cell.isFuture}
                   onPress={() => cell.value && setTempSelectedDate(cell.value)}
                 >
                   <Text
                     style={[
                       styles.dayCellText,
                       isSelected && styles.dayCellTextSelected,
-                      !cell.value && styles.dayCellTextEmpty
+                      !cell.value && styles.dayCellTextEmpty,
+                      cell.isFuture && styles.dayCellTextDisabled,
                     ]}
                   >
                     {cell.label}
@@ -298,6 +311,9 @@ const styles = StyleSheet.create({
   },
   dayCellTextEmpty: {
     color: 'transparent',
+  },
+  dayCellTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.2)',
   },
   dialogFooter: {
     flexDirection: 'row',

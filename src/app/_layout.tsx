@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+// Firebase Auth imports removed
+
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Drawer } from 'expo-router/drawer';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { useColorScheme, LogBox, View, ActivityIndicator, Text, Image, Animated, Easing } from 'react-native';
+import * as Updates from 'expo-updates';
 import CustomSidebar from '@/components/CustomSidebar';
 
 // Suppress third-party deprecation warnings that originate inside node_modules
@@ -38,7 +39,7 @@ const GESTURE_OPTIONS = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [authReady, setAuthReady] = useState(false);
+  const [authReady, setAuthReady] = useState(true);
   const [scaleAnim] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
@@ -59,19 +60,31 @@ export default function RootLayout() {
         })
       ])
     ).start();
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        console.log("✅ Backend secured and connected!");
-        setAuthReady(true);
-      }
-    });
-
-    signInWithEmailAndPassword(auth, 'ishaqsathik3@gmail.com', 'Alpha#2026wear')
-      .catch((error) => console.error("❌ Connection failed:", error));
-
-    return unsubscribe;
   }, []);
+
+  // ── OTA Updates: silently check, download, and apply on next restart ──
+  useEffect(() => {
+    async function checkForOTAUpdate() {
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          console.log('📦 OTA update available, downloading...');
+          await Updates.fetchUpdateAsync();
+          console.log('✅ OTA update downloaded. It will be applied on next app restart.');
+        } else {
+          console.log('✅ App is up to date.');
+        }
+      } catch (e) {
+        // Silently handle errors — updates are not critical for app operation.
+        // Common case: this runs in dev mode where Updates API is unavailable.
+        console.log('ℹ️ OTA update check skipped:', e instanceof Error ? e.message : e);
+      }
+    }
+
+    if (authReady) {
+      checkForOTAUpdate();
+    }
+  }, [authReady]);
 
   if (!authReady) {
     return (

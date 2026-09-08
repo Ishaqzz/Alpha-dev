@@ -1,27 +1,25 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { DrawerNavigationProp } from 'expo-router/drawer';
-import { useNavigation } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
-import { useDrawerSwipeGesture } from '@/hooks/useDrawerSwipeGesture';
 import Header from '@/components/Header';
-import { collection, getDocs, doc, updateDoc, deleteField, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { useDrawerSwipeGesture } from '@/hooks/useDrawerSwipeGesture';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useNavigation } from 'expo-router';
+import { DrawerNavigationProp } from 'expo-router/drawer';
+import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { useCallback, useEffect, useState } from 'react';
+import { db } from '../firebaseConfig';
 
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
-  Image,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  Platform,
-  Alert,
-  RefreshControl,
+  View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -252,7 +250,7 @@ export default function RecycleBinScreen() {
 
         {/* ── Grid Wrapper for Deleted Lists ── */}
         <View style={styles.gridContainer}>
-          
+
           {/* ── Left Column: Deleted Bills ── */}
           <View style={styles.card}>
             {/* Header Strip */}

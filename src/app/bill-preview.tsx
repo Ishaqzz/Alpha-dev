@@ -19,6 +19,7 @@ import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
+import { sendWhatsAppReceipt } from '../utils/whatsappHelper';
 
 // ── Web fallback font ─────────────────────────────────────────────────────────
 const systemFont = Platform.select({
@@ -435,33 +436,54 @@ export default function BillPreviewScreen() {
     return uri;
   };
 
-  // ── PDF: Save to phone ─────────────────────────────────────────────
-  const handleSavePdf = async () => {
-    if (isPrinting) return;
-    try {
-      setIsPrinting(true);
-      const html = buildPdfHtml({
-        billNo, date, time, paymentMethod, customerName, shopName,
-        mobileNo, transportService, subtotal, savings, grandTotal,
-        gstAmount, items, shopGstNumber: storeGstNumber, upiId: 'nothullar93@oksbi',
-      });
-      const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `Save Invoice ${billNo}`,
-        UTI: 'com.adobe.pdf',
-      });
-    } catch (err: any) {
-      console.error('[BillPreview] Error saving PDF:', err);
-      Alert.alert('Save Error', err.message || 'Could not save PDF.');
-    } finally {
-      setIsPrinting(false);
+  // ── Share Invoice via WhatsApp ───────────────────────────────────────────
+  const handleShareWhatsApp = async () => {
+    if (!mobileNo || !mobileNo.trim()) {
+      Alert.alert('No Mobile Number', 'This invoice does not have a customer mobile number.');
+      return;
     }
+    await sendWhatsAppReceipt({
+      customerPhone: mobileNo,
+      customerName,
+      billId: billNo,
+      totalAmount: grandTotal,
+      items: items.map(item => ({
+        name: item.desc || item.code || 'Item',
+        quantity: item.qty,
+        price: item.price,
+        total_price: item.total,
+      })),
+    });
   };
 
-  // ── PDF: Share from Documents/AlphaBill/<BILL_NUMBER>.pdf ───────────────────
+  // ── Share PDF (with WhatsApp quick option) ────────────────────────────────
   const handleSharePdf = async () => {
-    if (isPrinting) return;
+    if (mobileNo && mobileNo.trim()) {
+      Alert.alert(
+        `Share Invoice #${billNo}`,
+        'Choose how you would like to share this invoice:',
+        [
+          {
+            text: 'Send to WhatsApp',
+            onPress: () => handleShareWhatsApp(),
+          },
+          {
+            text: 'Share PDF (Other Apps)...',
+            onPress: () => executeSharePdfSystem(),
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]
+      );
+      return;
+    }
+
+    await executeSharePdfSystem();
+  };
+
+  const executeSharePdfSystem = async () => {
     try {
       setIsPrinting(true);
 
@@ -509,6 +531,30 @@ export default function BillPreviewScreen() {
     }
   };
 
+  // ── PDF: Save to phone ─────────────────────────────────────────────
+  const handleSavePdf = async () => {
+    if (isPrinting) return;
+    try {
+      setIsPrinting(true);
+      const html = buildPdfHtml({
+        billNo, date, time, paymentMethod, customerName, shopName,
+        mobileNo, transportService, subtotal, savings, grandTotal,
+        gstAmount, items, shopGstNumber: storeGstNumber, upiId: 'nothullar93@oksbi',
+      });
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Save Invoice ${billNo}`,
+        UTI: 'com.adobe.pdf',
+      });
+    } catch (err: any) {
+      console.error('[BillPreview] Error saving PDF:', err);
+      Alert.alert('Save Error', err.message || 'Could not save PDF.');
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
@@ -550,6 +596,17 @@ export default function BillPreviewScreen() {
               <Text style={[styles.actionBtnText, { color: '#000000', marginLeft: 4 }]}>
                 {isPrinting ? 'Opening…' : 'Share'}
               </Text>
+            </TouchableOpacity>
+
+            {/* WhatsApp */}
+            <TouchableOpacity
+              style={styles.actionBtnWhatsApp}
+              activeOpacity={0.8}
+              onPress={handleShareWhatsApp}
+              disabled={isPrinting}
+            >
+              <MaterialCommunityIcons name="whatsapp" size={15} color="#FFFFFF" />
+              <Text style={[styles.actionBtnText, { marginLeft: 4 }]}>WhatsApp</Text>
             </TouchableOpacity>
 
             {/* Close */}
@@ -817,6 +874,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#DEB841',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    gap: 4,
+  },
+  actionBtnWhatsApp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#25D366',
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 20,

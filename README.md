@@ -35,6 +35,22 @@ npm run reset-project
 
 This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
+## Android releases
+
+This project is configured for EAS Update. Build the Android app once for the current native runtime:
+
+```bash
+npm run build:android:production
+```
+
+For JavaScript, styling, and bundled asset changes that do not require native changes, publish an OTA update to the production channel:
+
+```bash
+npm run update:android:production -- --message "Describe the update"
+```
+
+The installed production build checks the `production` channel for updates. Increase the app version and create a new EAS build whenever native dependencies, native configuration, permissions, or the runtime changes. OTA updates must use the same runtime version as the installed build.
+
 ### Other setup steps
 
 - To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { DrawerNavigationProp } from 'expo-router/drawer';
 import React, { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -24,6 +25,8 @@ import { Bill, mapFirestoreBill } from '@/utils/billMapper';
 import { deleteDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { captureRef } from 'react-native-view-shot';
 import { db } from '../firebaseConfig';
+import { shareInvoiceToWhatsApp } from '../utils/shareInvoiceWhatsApp';
+import { generateWhatsAppReceiptText } from '../utils/whatsappHelper';
 
 const systemFont = Platform.select({
   web: 'Montserrat, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
@@ -490,8 +493,36 @@ export default function InvoiceViewScreen() {
     }
   };
 
-  // ── Share Invoice as JPG ───────────────────────────────────────────────
+  // ── Share Invoice as JPG (with WhatsApp quick option) ─────────────────
   const handleShareJpg = async () => {
+    if (!bill || isProcessing) return;
+
+    if (bill.mobile_number && bill.mobile_number.trim()) {
+      Alert.alert(
+        `Share Invoice #${bill.bill_number}`,
+        'Choose how you would like to share this invoice:',
+        [
+          {
+            text: 'Send to WhatsApp',
+            onPress: () => handleShareWhatsApp(),
+          },
+          {
+            text: 'Other Apps...',
+            onPress: () => executeShareJpgSystem(),
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]
+      );
+      return;
+    }
+
+    await executeShareJpgSystem();
+  };
+
+  const executeShareJpgSystem = async () => {
     if (!bill || isProcessing) return;
     try {
       setIsProcessing(true);
@@ -520,6 +551,50 @@ export default function InvoiceViewScreen() {
     } catch (err: any) {
       console.error('[InvoiceView] Error sharing JPG:', err);
       Alert.alert('Share Error', err.message || 'Could not share invoice.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // ── Share Invoice directly to Customer WhatsApp ────────────────────────
+  const handleShareWhatsApp = async () => {
+    if (!bill || isProcessing) return;
+    
+    if (!bill.mobile_number || !bill.mobile_number.trim()) {
+      Alert.alert('No Mobile Number', 'This invoice does not have a customer mobile number. Cannot send to WhatsApp.');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      if (!invoiceRef.current) throw new Error('Invoice view not ready.');
+
+      // Wait for layout to fully render
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const uri = await captureRef(invoiceRef, { format: 'jpg', quality: 0.95 });
+
+      // Generate formatted WhatsApp receipt text
+      const msgText = generateWhatsAppReceiptText({
+        customerName: bill.customer_name || 'Walk-in Customer',
+        billId: bill.bill_number,
+        totalAmount: bill.grand_total,
+        items: (bill.items || []).map((item: any) => ({
+          name: item.name || item.item_desc || item.itemDesc || item.desc || 'Item',
+          quantity: item.quantity || item.qty || 0,
+          price: item.actual_price || item.actualRate || item.rate || item.price || 0,
+          total_price: item.total_price || item.total || item.amount || 0,
+        })),
+      });
+
+      // Share image + text directly to the customer's WhatsApp
+      await shareInvoiceToWhatsApp({
+        imageUri: uri,
+        customerPhone: bill.mobile_number.trim(),
+        messageText: msgText,
+      });
+    } catch (err: any) {
+      console.error('[InvoiceView] Error sharing to WhatsApp:', err);
+      Alert.alert('WhatsApp Error', err.message || 'Could not share invoice to WhatsApp.');
     } finally {
       setIsProcessing(false);
     }
@@ -611,6 +686,23 @@ export default function InvoiceViewScreen() {
           >
             <MaterialCommunityIcons name="share-variant" size={16} color="#000000" />
             <Text style={[styles.actionBtnText, { color: '#000000', marginLeft: 4 }]}>Share JPG</Text>
+          </TouchableOpacity>
+
+          {/* WhatsApp Share Button */}
+          <TouchableOpacity 
+            style={styles.actionBtnWhatsApp} 
+            activeOpacity={0.8}
+            onPress={handleShareWhatsApp}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <ActivityIndicator size={14} color="#FFFFFF" />
+            ) : (
+              <MaterialCommunityIcons name="whatsapp" size={16} color="#FFFFFF" />
+            )}
+            <Text style={[styles.actionBtnText, { marginLeft: 4 }]}>
+              {isProcessing ? 'Sending…' : 'WhatsApp'}
+            </Text>
           </TouchableOpacity>
 
           {/* Edit Bill Button */}
@@ -897,6 +989,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#DEB841', // Gold
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20, // Pill shape
+    gap: 4,
+  },
+  actionBtnWhatsApp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#25D366', // WhatsApp brand green
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 20, // Pill shape

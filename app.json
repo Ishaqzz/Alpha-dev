@@ -12,24 +12,15 @@
       "bundleIdentifier": "com.mohamedishaq.alphaandroid"
     },
     "android": {
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.jpeg",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.mohamedishaq.alphaandroid",
+      "package": "com.aplhadev.com",
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
-        {
-          "action": "VIEW",
-          "data": [
-            {
-              "scheme": "https"
-            },
-            {
-              "scheme": "whatsapp"
-            }
-          ]
-        },
         {
           "action": "VIEW",
           "data": [
