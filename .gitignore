@@ -46,6 +46,7 @@ artifacts/*
 /ios
 /android
 google-services.json
+eas.json
 serviceAccountKey.json
 .env*
 customer.json
